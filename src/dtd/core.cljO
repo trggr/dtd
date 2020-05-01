@@ -1,0 +1,175 @@
+(ns dtd.core
+  (:use [quil.core]
+        [quil.middleware]))
+
+
+(defn pulse [low high rate]
+  (let [half (/ (- high low) 2)]
+    (+ low half (* (sin (/ (millis) 1000.0 rate)) half))))
+
+(defn rnd [low high]
+        (+ low (rand (- high low))))
+
+(defn rand-coord [size]
+        [(rnd (- size) size), (rnd (- size) size)])
+
+(defn translate-v2 [[x y] [dx dy]]
+        [(+ x dx) (+ y dy)])
+
+(defn render-ship [ship]
+        (fill 50 80 50)
+        (rect -2 0 5 14)
+        (fill 150 180 150)
+        (triangle 0 -10 25 0 0  10)
+        (fill 30 100 30)
+        (ellipse 8 0 8 8))
+
+(defn create-ship []
+        {:pos [-1000 1000]
+         :dir       -0.4
+         :dir-change 0.0                                                                                      
+         :speed      0.1
+         :z          1.0
+         :render-fn  render-ship})
+
+(defn create-star []
+        {:pos       (rand-coord 1000)
+         :dir       (rand TWO-PI)
+         :size      (+ 1.0 (rand 3.0))
+         :z         (rnd 0.2 0.7)
+         :render-fn #(let [size (:size %1)]
+                           (fill 255)
+                           (rect 0 0 size size))})
+
+(defn render-smoke [smoke]
+        (let [age (:age smoke)
+              size (max 0.0 (- 10.0 (* 5.0 age)))
+              [r g b] (:col smoke)]
+          (fill r g b 200)
+          (ellipse 0 0 size size)))
+
+(defn create-smoke [[x y]]
+        {:pos       [(+ x (rnd -3 3)) (+ y (rnd -3 3))]
+         :dir       0.0
+         :age       0.0
+         :z         1.0
+         :col       [(rnd 150 255) (rnd 100 200) (rnd 0 100)]
+         :render-fn render-smoke})
+
+(defn render-planet [planet]
+  (let [size (:size planet)
+        rs   (:rs planet)
+        step (/ TWO-PI (count rs))]
+      (apply fill (:color planet))
+      (begin-shape)
+      (doseq [[angle radius] (map vector (range 0 TWO-PI step) rs)]
+          (vertex (* size radius (cos angle))
+                  (* size radius (sin angle))))
+      (end-shape)))
+
+(defn create-planet []
+        {:pos        (rand-coord 1000)
+         :dir        (rand TWO-PI)
+         :dir-change (rnd -0.01 0.01)
+         :size       (+ 50.0 (rand 50.0))
+         :drift      [(rnd -0.3 0.3) (rnd -0.3 0.3)]
+         :color      [(rnd 0 255) (rnd 50 150) (rnd 50 150)]
+         :z          1.0
+         :rs         (into [] (take (+ 5 (rand-int 7)) (repeatedly #(rnd 0.5 1.0))))
+         :render-fn  render-planet})
+
+(defn setup []
+        (rect-mode :center)
+        (frame-rate 30)
+        {:ship    (create-ship)
+         :smoke   []
+         :stars   (for [_ (range 3000)] (create-star))
+         :planets (for [_ (range 50)]   (create-planet))})
+
+(defn move-ship [ship]
+       (let [speed (+ 1.0 (* 7.0 (:speed ship)))
+             dir (:dir ship)
+             dx (* speed (cos dir))
+             dy (* speed (sin dir))]
+         (update-in ship [:pos] translate-v2 [dx dy])))
+
+(defn auto-rotate [entity]
+  (let [x (:dir-change entity)]
+    (update-in entity [:dir] #(+ % x))))
+
+(defn wiggle-ship [ship]
+  (let [speed (:speed ship)
+        a (+ 0.01 (* 0.03 speed))]
+    (update-in ship [:dir] #(+ % (pulse (- a) a 0.1)))))
+
+(defn drift-planet [planet]
+  (let [[dx dy] (:drift planet)]
+    (update-in planet [:pos] translate-v2 [dx dy])))
+
+(defn smoke-reducer [acc smoke]
+    (let [age (+ (:age smoke) 0.033)]
+       (if (>= age 3.0)
+           acc
+           (conj acc (assoc smoke :age age)))))
+
+(defn update-state [state]
+  (-> state
+      (update-in [:ship]    auto-rotate)
+      (update-in [:ship]    wiggle-ship)
+      (update-in [:ship]    move-ship)
+      (update-in [:smoke]   #(reduce smoke-reducer
+                                     [(create-smoke (-> state :ship :pos))]
+                                     %1))
+      (update-in [:planets] #(map auto-rotate %))
+      (update-in [:planets] #(map drift-planet %))))
+
+(defn key-pressed [state event]
+  (case (:key event)
+        (:w :up)    (update-in state [:ship :speed]      #(min 1.0 (+ % 0.25)))
+        (:s :down)  (update-in state [:ship :speed]      #(max 0.0 (- % 0.25)))
+        (:a :left)  (assoc-in  state [:ship :dir-change] -0.15)
+        (:d :right) (assoc-in  state [:ship :dir-change] 0.15)
+        state))
+
+(defn key-released [state event]
+   (if (contains? #{:left :right :a :d} (key-as-keyword))
+       (assoc-in state [:ship :dir-change] 0)
+       state))
+
+(defn on-screen? [x y]
+    (and (<= -100  x (+ 100 (width)))
+         (<= -100  y (+ 100 (height)))))
+
+(defn draw-entity [entity [cam-x cam-y]]
+  (let [[x y]    (:pos entity)
+        z        (:z entity)
+        screen-x (- x (* z cam-x))
+        screen-y (- y (* z cam-y))]
+    (when (on-screen? screen-x screen-y)
+          (push-matrix)
+          (translate screen-x screen-y)
+          (rotate (:dir entity))
+          ((:render-fn entity) entity)
+          (pop-matrix))))
+
+(defn draw-state [state]
+  (background (pulse 20 40 15.0)
+              (pulse 40 60 40.0)
+              (pulse 50 70  5.0))
+  (no-stroke)
+  (let [pos (-> state :ship :pos)
+        cam (translate-v2 pos [(* -0.5 (width)) (* -0.5 (height))])]
+    (doseq [s (:stars state)]   (draw-entity s cam))
+    (doseq [p (:planets state)] (draw-entity p cam))
+    (doseq [m (:smoke state)]   (draw-entity m cam))
+    (draw-entity (:ship state) cam)))
+
+(defsketch nanoscopic
+  :host         "host"
+  :size         [500 500]
+  :setup        setup
+  :update       update-state
+  :key-pressed  key-pressed
+  :key-released key-released
+  :draw         draw-state
+  :middleware   [fun-mode])
