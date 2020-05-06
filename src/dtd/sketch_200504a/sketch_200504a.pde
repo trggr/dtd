@@ -136,6 +136,7 @@ void drawGhostTower() {
   fill(0, 200, 0);
   rect(xs[GHOSTI-1], ys[GHOSTJ-1], S, S);
 
+
   // reach
   fill(180, 180, 180, 45);
   ellipse(xs[GHOSTI], ys[GHOSTJ], 400, 400);
