@@ -42,7 +42,7 @@ void drawGrid() {
 
 //----------------------------
 void drawTower(int n) {
-  int i = TOWERI[n];
+  int i = TOWERI[n]; // upper-left corner
   int j = TOWERJ[n];
 
   // platform
@@ -51,12 +51,17 @@ void drawTower(int n) {
   fill(200, 200, 200);
   rect(XS[i], YS[j], S, S);
 
-  // tower
+  // bashnya
   strokeWeight(4);
-  ellipse(XS[i+1], YS[j+1], 50, 50);
+  fill(50, 50, 50);
+  ellipse(XS[i+1], YS[j+1], GS, GS);
+  
+  // dulo
+  stroke(0, 0, 0);
+  strokeWeight(5);
+  line(XS[i+1], YS[j+1], XS[i] + 10, YS[j] + 10);
 
-  fill(0, 0, 0);
-  text("5", XS[i + 1] + 2, YS[j + 1] + 2);
+  text("5", XS[i+2] - 10, YS[j+2] - 10);
 }
 
 void drawTowers() {
