@@ -24,7 +24,10 @@ int field[][] = new int[N][M];
 int GHOSTI    = 1;
 int GHOSTJ    = 1;
 
+int AMOUNT    = 100;
+
 int TIMETOUPDATEZEEK = 0;
+
 
 void setup() {
   size(800, 600);
@@ -45,7 +48,7 @@ void setup() {
   for (int i = 0; i < NZEEKS; i++) {
     ZEEKI[i] = 2;
     ZEEKJ[i] = 10;
-    ZEEKD[i] = int(random(1, 8));
+    ZEEKD[i] = int(random(1, 3));
   }
 }
 
@@ -124,13 +127,15 @@ int yj(int y) {
 
 //-----
 void buildTower() {
-  if (NTOWERS >= MAXTOWERS ||
+  if (AMOUNT <= 0 ||
+      NTOWERS >= MAXTOWERS ||
      field[GHOSTI-1][GHOSTJ-1] == 1 || field[GHOSTI][GHOSTJ-1] == 1 || 
      field[GHOSTI-1][GHOSTJ]   == 1 || field[GHOSTI][GHOSTJ]   == 1)
   {
      return;
   }
 
+  AMOUNT -= 10;
   TOWERI[NTOWERS] = GHOSTI - 1;
   TOWERJ[NTOWERS] = GHOSTJ - 1;
   NTOWERS++;
@@ -223,11 +228,15 @@ void updateZeeks() {
           case 5:  moveZeek(i, -1,  1); break;
           case 6:  moveZeek(i, -1,  0); break;
           case 7:  moveZeek(i, -1, -1); break;
-          default: moveZeek(i, 0, -1);  break;
+          default: moveZeek(i,  0, -1);
         }
     }
 }
 
+void drawStatus() {
+  text("Amount: " + AMOUNT, XS[2], YS[2]);
+}
+  
 void draw() {
   clear();
   drawGrid();
@@ -236,5 +245,6 @@ void draw() {
       updateZeeks();
   TIMETOUPDATEZEEK = (TIMETOUPDATEZEEK + 1) % 4;
   drawZeeks();
+  drawStatus();
   drawGhostTower();
 }
