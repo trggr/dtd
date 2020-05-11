@@ -1,4 +1,4 @@
-int S         = 60;
+int S         = 42;
 int HS        = S/2;
 int QS        = S/4;
 float GS      = S*0.6;
@@ -14,7 +14,7 @@ int MAXZEEKS  = 100;
 int NZEEKS    = 0;
 int ZEEKI[]   = new int[MAXZEEKS]; //x-coord of zeek
 int ZEEKJ[]   = new int[MAXZEEKS];
-int ZEEKD[]   = new int[MAXZEEKS]; // direction of movement: 1-12 - like clock's arms  
+int ZEEKD[]   = new int[MAXZEEKS]; // direction of movement: 1-8 - like clock's arms  
 
 int N         = 2*WIDTH/S + 1;
 int M         = 2*HEIGHT/S + 1;
@@ -25,9 +25,10 @@ int GHOSTI    = 1;
 int GHOSTJ    = 1;
 
 int AMOUNT    = 100;
+int LIVES     = 20;
 
 int TIMETOUPDATEZEEK = 0;
-
+int TIMER;
 
 void setup() {
   size(800, 600);
@@ -173,7 +174,8 @@ void drawGhostTower() {
   }
 
   if (field[GHOSTI-1][GHOSTJ-1] == 1 || field[GHOSTI]  [GHOSTJ-1] == 1 || 
-      field[GHOSTI-1][GHOSTJ]   == 1 || field[GHOSTI]  [GHOSTJ]   == 1) {
+      field[GHOSTI-1][GHOSTJ]   == 1 || field[GHOSTI]  [GHOSTJ]   == 1 ||
+      AMOUNT <= 0) {
           fill(200, 0, 0, 45);
    } else { 
           fill(0, 200, 0, 45);
@@ -234,16 +236,22 @@ void updateZeeks() {
 }
 
 void drawStatus() {
-  text("Amount: " + AMOUNT, XS[2], YS[2]);
+  fill(255, 255, 0);
+  text("Amount: " + AMOUNT + "   Timer: " + TIMER + "   Lives: " + LIVES, XS[1], YS[1]);
 }
-  
+
+void updateTimer() {
+  TIMER = millis()/1000;
+}
+
 void draw() {
   clear();
+  updateTimer();
   drawGrid();
   drawTowers();
-  if (TIMETOUPDATEZEEK == 0)
+  if (TIMETOUPDATEZEEK == 0 && TIMER >= 10)
       updateZeeks();
-  TIMETOUPDATEZEEK = (TIMETOUPDATEZEEK + 1) % 4;
+  TIMETOUPDATEZEEK = (TIMETOUPDATEZEEK + 1) % 10;
   drawZeeks();
   drawStatus();
   drawGhostTower();

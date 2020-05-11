@@ -2,104 +2,253 @@
   (:use [quil.core]
         [quil.middleware]))
 
+(println "here")
+
+(def S         42)
+(def HS        (/ S 2))
+(def QS        (/ S 4))
+(def GS        (* S 0.6))
+(def WIDTH     720)
+(def HEIGHT    600)
+
+(def MAXTOWERS 60)
+(def NTOWERS   0)
+(def N         (inc (/ (* 2 WIDTH) S)))
+(def M         (inc (/ (* 2 HEIGHT) S)))
+(def XS        (vec (for [i (range N)] (* i HS))))
+(def YS        (vec (for [i (range M)] (* i HS))))
+(def MAXZEEKS  100)
+(def NZEEKS    10)
+(def AMOUNT    100)
+(def LIVES     20)
+(def GHOSTI    1)
+(def GHOSTJ    1)
+(def TIMETOUPDATEZEEK 0)
+(def TIMER     0)
+
+
+; 
+; //----------------------------
+; void drawTower(int n) {
+;   int i = TOWERI[n]; // upper-left corner
+;   int j = TOWERJ[n];
+; 
+;   // platform
+;   stroke(0, 0, 0);
+;   strokeWeight(2);
+;   fill(200, 200, 200);
+;   rect(XS[i], YS[j], S, S);
+; 
+;   // bashnya
+;   strokeWeight(4);
+;   fill(50, 50, 50);
+;   ellipse(XS[i+1], YS[j+1], GS, GS);
+;   
+;   // dulo
+;   stroke(0, 0, 0);
+;   strokeWeight(5);
+;   line(XS[i+1], YS[j+1], XS[i] + 10, YS[j] + 10);
+; 
+;   text("5", XS[i+2] - 10, YS[j+2] - 10);
+; }
+; 
+; void drawTowers() {
+;   for (int i = 0; i < NTOWERS; i++) {
+;     drawTower(i);
+;   }
+; }
+; 
+; 
+; //-----
+; void buildTower() {
+;   if (AMOUNT <= 0 ||
+;       NTOWERS >= MAXTOWERS ||
+;      field[GHOSTI-1][GHOSTJ-1] == 1 || field[GHOSTI][GHOSTJ-1] == 1 || 
+;      field[GHOSTI-1][GHOSTJ]   == 1 || field[GHOSTI][GHOSTJ]   == 1)
+;   {
+;      return;
+;   }
+; 
+;   AMOUNT -= 10;
+;   TOWERI[NTOWERS] = GHOSTI - 1;
+;   TOWERJ[NTOWERS] = GHOSTJ - 1;
+;   NTOWERS++;
+;   
+;   field[GHOSTI-1][GHOSTJ-1] = 1; // occupy 4 fields
+;   field[GHOSTI]  [GHOSTJ-1] = 1; 
+;   field[GHOSTI-1][GHOSTJ]   = 1;
+;   field[GHOSTI]  [GHOSTJ]   = 1;
+; }
+; 
+; //-----
+; void mouseClicked() {
+;     buildTower();
+; }
+; 
+; void drawGhostTower() {
+;   int x = mouseX;
+;   int y = mouseY;
+;   if (x <= 0 || y <= 0 || x >= WIDTH || y >= HEIGHT)
+;     return;
+; 
+;   int k = xi(x);
+;   int l = yj(y);
+;   float md = 1000000; // big enough
+; 
+;   for (int i = k; i <= k+1; i++) {
+;     for (int j = l; j <= l+1; j++) {
+;       float tmp = dist(x, y, XS[i], YS[j]);
+;       if (tmp < md) {
+;         md = tmp;
+;         GHOSTI = i;
+;         GHOSTJ = j;
+;       }
+;     }
+;   }
+; 
+;   if (field[GHOSTI-1][GHOSTJ-1] == 1 || field[GHOSTI]  [GHOSTJ-1] == 1 || 
+;       field[GHOSTI-1][GHOSTJ]   == 1 || field[GHOSTI]  [GHOSTJ]   == 1 ||
+;       AMOUNT <= 0) {
+;           fill(200, 0, 0, 45);
+;    } else { 
+;           fill(0, 200, 0, 45);
+;    }
+;    stroke(0, 0, 0);
+;    rect(XS[GHOSTI-1], YS[GHOSTJ-1], S, S);
+; 
+;    // reach
+; 
+;    fill(180, 180, 180, 45);
+;    ellipse(XS[GHOSTI], YS[GHOSTJ], S*3, S*3);
+; }
+; 
+; 
+; void moveZeek(int n, int dx, int dy) {
+;   int i = ZEEKI[n] + dx;
+;   int j = ZEEKJ[n] + dy;
+;   
+;   if (i >= 2 && i <= N-2 && j >= 2 && j <= M-2 && field[i][j] == 0) {
+;       field[ZEEKI[n]][ZEEKJ[n]] = 0;
+;       ZEEKI[n] = i;
+;       ZEEKJ[n] = j;
+;       field[i][j] = 1;
+;   }
+;   else
+;       ZEEKD[n] = int(random(1,8));
+; }
+;       
+; void updateZeeks() {
+;     for (int i = 0; i < NZEEKS; i++) {
+;         switch (ZEEKD[i]) {
+;           case 1:  moveZeek(i,  1, -1); break;
+;           case 2:  moveZeek(i,  1,  0); break;
+;           case 3:  moveZeek(i,  1,  1); break;
+;           case 4:  moveZeek(i,  0,  1); break;
+;           case 5:  moveZeek(i, -1,  1); break;
+;           case 6:  moveZeek(i, -1,  0); break;
+;           case 7:  moveZeek(i, -1, -1); break;
+;           default: moveZeek(i,  0, -1);
+;         }
+;     }
+; }
+; 
+; void updateTimer() {
+;   TIMER = millis()/1000;
+; }
+; 
+
 (defn rnd [low high]    (+ low (rand (- high low))))
 
-(defn rnd-coord [size] [(rnd (- size) size), (rnd (- size) size)])
+(defn xi [x]
+   (cond (<= x 0) 0
+         (>= x (nth XS (- N 2))) (- N 2)
+         :else (some #(<= x (nth XS %)) (range (- N 1)))))
 
-(defn translate2 [a b] (map + a b))
-
-(defn render-tower [tower]
-        (let [s  (:size tower)
-              -s (- s)
-              h  (/ s 2)
-              g  (* s 0.6)]
-              (stroke 255 0 0) ; red
-              (fill 150) ; grey
-              (rect 0 0 s s)
-              (fill 50)  ; black
-              (ellipse h h g g)
-              (line 0 0    s  s)
-              (line 0 s s  0)
-              (fill 255)
-              (text "NW" 0 0)
-              (text "NE" s 0)
-              (text "SE" s s)
-              (text "SW" 0 s)))
-
-(defn render-amount [amount]
-         (text (str amount) 0 10))
-
-(defn create-nata []
-        {:pos       (rnd-coord 1000)
-         :size      (+ 1.0 (rand 3.0))
-         :dir       (rand TWO-PI)
-         :color     [(rnd 0 255) (rnd 50 150) (rnd 50 150)]
-         :z         (rnd 0.2 0.7)
-         :render    #(let [size (:size %1)]
-                           (fill 255)
-                           (rect 0 0 size size))})
-
-(defn create-tower []
-        {:pos        (rnd-coord 1000)
-         :level      1
-         :dir        (rand TWO-PI)
-         :size       60
-         :color      [(rnd 0 255) (rnd 50 150) (rnd 50 150)]
-         :z          1.0
-         :render     render-tower})
-
-(defn create-amount []
-        {:pos        [10 20]
-         :z          1.0
-	 :amount     20
-         :render     render-amount})
-
-(defn setup []
-;        (ellipse-mode :center)
-        (frame-rate 30)
-        {:tower-types []
-         :levels      []
-         :amount      (create-amount)
-         :level       1
-         :natas       (for [_ (range 300)] (create-nata))
-         :towers      (for [_ (range 50)]  (create-tower))})
+(defn yi [y]
+   (cond (<= y 0) 0
+         (>= y (nth YS (- M 1))) (- M 2)
+         :else (some #(<= y (nth YS %)) (range (- M 1)))))
 
 (defn update-state [state] state)
 (defn key-pressed [state event] state)
 (defn key-released [state event] state)
 
-(defn on-screen? [x y]
-    (and (<= -100  x (+ 100 (width)))
-         (<= -100  y (+ 100 (height)))))
+(defn draw-zeek [[id val]]
+   (let [{i :i j :j} val]
+       (stroke 200 0 200)
+       (fill 200 0 200)
+       (stroke-weight 2)
+       (ellipse (+ (XS i) QS) (+ (YS j) QS) HS HS)))
 
-(defn draw-entity [entity [camx camy]]
-  (let [[x y]    (:pos entity)
-        z        (:z entity)
-        f        (:render entity)]
-        (when (on-screen? x y)
-              (push-matrix)
-              (translate x y)
-              (f entity)
-              (pop-matrix))))
+(defn draw-zeeks [state]
+   (doseq [z (state :zeeks)]
+	(draw-zeek z)))
 
-(defn draw-state [state]
-        (background 20 40 15.0)
-        (no-stroke)
-        (let [pos [100 200]
-              ; cam (translate2 pos [(* -0.5 (width)) (* -0.5 (height))])
-              cam pos]
-              (doseq [n  (:natas state)] (draw-entity n cam))
-              (doseq [t (:towers state)] (draw-entity t cam))
-              (draw-entity (:amount state) cam)))
+(defn draw-grid [state]
+   (stroke-weight 1)
+   (stroke 50 50 50)
+   (doseq [i (range N)]
+       (line (XS i) 0 (XS i) HEIGHT))
+   (doseq [j (range M)]
+       (line 0 (YS j) WIDTH (YS j))))
+
+(defn draw-status [state]
+   (fill 255 255 0)
+   (text (str "Amount: " AMOUNT "   Timer: " TIMER "   Lives: " LIVES) (XS 1), (YS 1)))
+
+; void draw() {
+;+   clear();
+;   updateTimer();
+;+   drawGrid();
+;   drawTowers();
+;   if (TIMETOUPDATEZEEK == 0 && TIMER >= 10)
+;       updateZeeks();
+;   TIMETOUPDATEZEEK = (TIMETOUPDATEZEEK + 1) % 10;
+;   drawZeeks();
+;+   drawStatus();
+;   drawGhostTower();
+; }
+
+(defn draw [state]
+	(clear)
+	(draw-grid state)
+	(println (state :zeeks))
+	(draw-zeeks state)
+	(draw-status state))
+
+;        (no-stroke)
+;        (let [pos [100 200]
+;              ; cam (translate2 pos [(* -0.5 (width)) (* -0.5 (height))])
+;              cam pos]
+;              (doseq [n  (:natas state)] (draw-entity n cam))
+;              (doseq [t (:towers state)] (draw-entity t cam))
+;              (draw-entity (:amount state) cam)))
+
+(defn setup []
+        (frame-rate 30)
+        {:tower-types []
+         :levels      []
+         :amount      100
+         :level       1
+         :field       {}
+         :zeeks       (reduce (fn [acc k]
+                                (assoc acc (keyword (str k)) {:i 2 :j 10 :dir (int (rnd 1 3))}))
+                              {}
+                              (range NZEEKS))
+         :towers      []})
+
+(println "here 2")
 
 (defsketch dtd
         :host         "host"
-        :size         [500 500]
+        :size         [720 600]
         :setup        setup
         :update       update-state
         :key-pressed  key-pressed
         :key-released key-released
-        :draw         draw-state
+        :draw         draw
         :middleware   [fun-mode])
+
+(println "here 3")
 
 (defn -main [& args] nil)
