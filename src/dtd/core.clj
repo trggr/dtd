@@ -26,37 +26,15 @@
 (def GHOSTI    1)
 (def GHOSTJ    1)
 (def TIMETOUPDATEZEEK 0)
+(def DEBUG     false)
 
 (println XS)
 (println YS)
 
+(defn debugg [s]
+    (when DEBUG
+        (println s)))
 
-; 
-; //----------------------------
-; void drawTower(int n) {
-;   int i = TOWERI[n]; // upper-left corner
-;   int j = TOWERJ[n];
-; 
-;   // platform
-;   stroke(0, 0, 0);
-;   strokeWeight(2);
-;   fill(200, 200, 200);
-;   rect(XS[i], YS[j], S, S);
-; 
-;   // bashnya
-;   strokeWeight(4);
-;   fill(50, 50, 50);
-;   ellipse(XS[i+1], YS[j+1], GS, GS);
-;   
-;   // dulo
-;   stroke(0, 0, 0);
-;   strokeWeight(5);
-;   line(XS[i+1], YS[j+1], XS[i] + 10, YS[j] + 10);
-; 
-;   text("5", XS[i+2] - 10, YS[j+2] - 10);
-; }
-; 
-; 
 ; //-----
 ; void buildTower() {
 ;   if (AMOUNT <= 0 ||
@@ -77,13 +55,12 @@
 ;   field[GHOSTI-1][GHOSTJ]   = 1;
 ;   field[GHOSTI]  [GHOSTJ]   = 1;
 ; }
-; 
-; //-----
-; void mouseClicked() {
-;     buildTower();
-; }
 
-; random number between low and high, both are inclusive
+(defn build-tower [state]
+    (let [[i j] (state :ghost-tower)]
+        (update-in state [:towers] conj [i j])))
+
+; random number between low and high, both are included in consideration
 (defn rnd [low high]
        (+ low (random (- high low -0.5))))
 
@@ -107,6 +84,7 @@
              8  [0 -1]})
 
 (defn move-zeek [zeek]
+    (debugg "move-zeek")
     (let [[dx dy] (dirref (zeek :dir))
           i       (+ dx (zeek :i))
           j       (+ dy (zeek :j))]
@@ -116,13 +94,30 @@
               (assoc zeek :i i :j j) ; also need field[i][j] = 1
               (assoc zeek :dir (int (rnd 1 8))))))
 
+(defn update-ghost-tower []
+    (debugg "update-ghost-tower")
+    (let [x (mouse-x)
+          y (mouse-y)]
+        (if (or (<= x 0) (>= x WIDTH) (<= y 0) (>= y HEIGHT))
+            [0 0]
+            (let [k  (xi x)
+                  l  (yi y)
+                  xs (for [i [k (inc k)] j [l (inc l)]] [(dist x y (XS i) (YS j)), i, j])
+                  rc (reduce (fn [acc b] 
+                              (if (< (first b) (first acc))
+                                  b
+                                  acc))
+                              [100000000 0 0]
+                              xs)]
+                  [(nth rc 1) (nth rc 2)]))))
+
 (defn update-state [state]
         (let [now (milsec)]
        	    (-> state
-                (assoc :timer       now)
-                (assoc :elapsed     (int (/ (- now (state :stimer)) 1000)))
-    	        (update-in [:zeeks] #(map move-zeek %))
-    	        (update-in [:ghost-tower] update-ghost-tower))))
+                (assoc     :timer       now)
+                (assoc     :elapsed     (int (/ (- now (state :stimer)) 1000)))
+    	        (update-in [:zeeks]     #(map move-zeek %))
+    	        (assoc     :ghost-tower (update-ghost-tower)))))
 
 (defn key-pressed [state event] state)
 (defn key-released [state event] state)
@@ -138,9 +133,21 @@
    (doseq [z (state :zeeks)]
 	(draw-zeek z)))
 
-(defn draw-tower [val] )
-
-(defn draw-towers [tower]
+(defn draw-tower [tower] 
+	(let [[i j] tower]
+	    (stroke 0 0 0)
+	    (stroke-weight 2)
+	    (fill 200 200 200)
+	    (rect (XS i) (YS j) S S)
+	    (stroke-weight 4)
+	    (fill 50 50 50)
+	    (ellipse (XS (inc i)) (YS (inc j)) GS GS)
+	    (stroke 0 0 0)
+	    (stroke-weight 5)
+	    (line (XS (inc i)) (YS (inc j)) (+ (XS i) 10) (+ (YS j) 10))
+            (text "5" (- (XS (+ 2 i)) 10), (- (YS (+ j 2)) 10))))
+	   
+(defn draw-towers [state]
         (doseq [t (state :towers)]
              (draw-tower t)))
 
@@ -167,21 +174,6 @@
                    "   Timer: " (state :elapsed)
                    "   Lives: " LIVES) (XS 1), (YS 1)))
 
-(defn update-ghost-tower [state]
-    (let [x (mouse-x)
-          y (mouse-y)]
-        (if (or (<= x 0) (>= x WIDTH) (<= y 0) (>= y HEIGHT))
-            [0 0]
-            (let [k  (xi x)
-                  l  (yi y)
-                  xs (for [i [k (inc k)] j [l (inc l)]] [(dist x y (XS i) (YS j)), i, j])
-                  rc (reduce (fn [acc b] 
-                              (if (< (first b) (first acc))
-                                  b
-                                  acc))
-                              [100000000 0 0]
-                              xs)]
-                  [(nth rc 1) (nth rc 2)]))))
 
 ;   if (field[GHOSTI-1][GHOSTJ-1] == 1 || field[GHOSTI]  [GHOSTJ-1] == 1 || 
 ;       field[GHOSTI-1][GHOSTJ]   == 1 || field[GHOSTI]  [GHOSTJ]   == 1 ||
@@ -203,9 +195,9 @@
 ;+   clear();
 ;+   updateTimer();
 ;+   drawGrid();
-;   drawTowers();
+;+   drawTowers();
 ;   if (TIMETOUPDATEZEEK == 0 && TIMER >= 10)
-;       updateZeeks();
+;+       updateZeeks();
 ;   TIMETOUPDATEZEEK = (TIMETOUPDATEZEEK + 1) % 10;
 ;+   drawZeeks();
 ;+   drawStatus();
@@ -214,13 +206,15 @@
 
 (defn draw [state]
 	(clear)
-	(println (state :ghost-tower))
 	(draw-grid state)
 	(draw-towers state)
 	(draw-zeeks state)
 	(draw-status state)
 	(draw-ghost-tower state))
 
+(defn mouse-pressed [state event]
+	(debugg event)
+	(build-tower state))
 
 (defn setup []
         (frame-rate   30)
@@ -237,13 +231,14 @@
          :towers      []})
 
 (defsketch dtd
-        :host         "host"
-        :size         [720 600]
-        :setup        setup
-        :update       update-state
-        :key-pressed  key-pressed
-        :key-released key-released
-        :draw         draw
-        :middleware   [fun-mode])
+        :host          "host"
+        :size          [720 600]
+        :setup         setup
+        :update        update-state
+	:mouse-pressed mouse-pressed
+        :key-pressed   key-pressed
+        :key-released  key-released
+        :draw          draw
+        :middleware    [fun-mode])
 
 (defn -main [& args] nil)
