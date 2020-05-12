@@ -169,46 +169,31 @@
          (>= y (nth YS (- M 1))) (- M 2)
          :else (some #(<= y (nth YS %)) (range (- M 1)))))
 
-(defn update-zeeks [zeek]
-    (println "update-zeek" zeek)
-    (update-in zeek [:i] inc))
+(def dirref {1  [1 -1]
+             2  [1  0]
+             3  [1  1]
+             4  [0  1]
+             5  [-1 1]
+             6  [-1 0]
+             7  [-1 -1]
+             8  [0 -1]})
+
+(defn move-zeek [zeek]
+    (let [[dx dy] (dirref (zeek :dir))
+          i       (+ dx (zeek :i))
+          j       (+ dy (zeek :j))]
+          (if (and (<= 2 i (- N 2))
+                   (<= 2 j (- M 2))  ; need to check field[i][j] = 0
+                   )
+              (assoc zeek :i i :j j) ; also need field[i][j] = 1
+              (assoc zeek :dir (int (random 1 8))))))
 
 (defn update-state [state] 
 	(-> state
-	    (update-in [:zeeks] #(map update-zeeks %))))
+	    (update-in [:zeeks] #(map move-zeek %))))
 
 (defn key-pressed [state event] state)
 (defn key-released [state event] state)
-
-; void moveZeek(int n, int dx, int dy) {
-;   int i = ZEEKI[n] + dx;
-;   int j = ZEEKJ[n] + dy;
-;   
-;   if (i >= 2 && i <= N-2 && j >= 2 && j <= M-2 && field[i][j] == 0) {
-;       field[ZEEKI[n]][ZEEKJ[n]] = 0;
-;       ZEEKI[n] = i;
-;       ZEEKJ[n] = j;
-;       field[i][j] = 1;
-;   }
-;   else
-;       ZEEKD[n] = int(random(1,8));
-; }
-;       
-
-; void updateZeeks() {
-;     for (int i = 0; i < NZEEKS; i++) {
-;         switch (ZEEKD[i]) {
-;           case 1:  moveZeek(i,  1, -1); break;
-;           case 2:  moveZeek(i,  1,  0); break;
-;           case 3:  moveZeek(i,  1,  1); break;
-;           case 4:  moveZeek(i,  0,  1); break;
-;           case 5:  moveZeek(i, -1,  1); break;
-;           case 6:  moveZeek(i, -1,  0); break;
-;           case 7:  moveZeek(i, -1, -1); break;
-;           default: moveZeek(i,  0, -1);
-;         }
-;     }
-; }
 
 (defn draw-zeek [val]
    (let [{i :i j :j} val]
