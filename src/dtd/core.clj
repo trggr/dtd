@@ -17,8 +17,8 @@
 (def WIDTH     (* HS N))
 (def HEIGHT    (* HS M))
 
-(def XS        (vec (for [i (range N)] (* i HS))))
-(def YS        (vec (for [i (range M)] (* i HS))))
+(def XS        (vec (for [i (range (inc N))] (* i HS))))
+(def YS        (vec (for [i (range (inc M))] (* i HS))))
 
 (def MAXTOWERS 60)
 (def NZEEKS    3)
@@ -156,14 +156,14 @@
 (defn draw-grid [state]
         (stroke-weight 1)
         (fill 150 150 150)
-        (doseq [i (range N)]
-	    (stroke (- 255 (* i 6)) 0 0)
-	    (text (str i) (XS i) (- HEIGHT 3))
-            (line (XS i) 0 (XS i) WIDTH))
-        (doseq [j (range M)]
-	    (stroke (- 255 (* j 6)) 0 0)
-	    (text (str j) 15 (+ (YS j) 15))
-            (line 0 (YS j) HEIGHT (YS j))))
+        (doseq [i XS]
+	    (stroke 150 0 0)
+	    (text (str i) i (- HEIGHT 15))
+            (line i 0 i WIDTH))
+        (doseq [j YS]
+	    (stroke 150 0 0)
+	    (text (str j) 15 j)
+            (line 0 j HEIGHT j)))
 
 (defn draw-ghost-tower [state]
         (let [[on-screen? i j] (state :ghost-tower)]
