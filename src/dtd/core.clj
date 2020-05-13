@@ -6,32 +6,29 @@
 (defn milsec []
     (System/currentTimeMillis))
 
-(def S         42)
+(def S         96)      ;; divisible by 2, 4, 6, 8
 (def HS        (/ S 2))
 (def QS        (/ S 4))
-(def GS        (* S 0.6))
-(def WIDTH     720)
-(def HEIGHT    600)
+(def GS        (* 6 (/ S 8)))
+(def S3        (* 3 S))
+
+(def N         20)
+(def M         18)
+(def WIDTH     (* HS N))
+(def HEIGHT    (* HS M))
+
+(def XS        (vec (for [i (range N)] (* i HS))))
+(def YS        (vec (for [i (range M)] (* i HS))))
 
 (def MAXTOWERS 60)
-(def NTOWERS   0)
-(def N         (int (inc (/ (* 2 WIDTH) S))))
-(def M         (int (inc (/ (* 2 HEIGHT) S))))
-(def XS        (vec (for [i (range N)] (int (* i HS)))))
-(def YS        (vec (for [i (range M)] (int (* i HS)))))
-(def MAXZEEKS  100)
-(def NZEEKS    10)
-(def AMOUNT    100)
-(def LIVES     20)
-(def GHOSTI    1)
-(def GHOSTJ    1)
+(def NZEEKS    3)
 (def TIMETOUPDATEZEEK 0)
-(def DEBUG     false)
+(def DEBUG     true)
 
 (println XS)
 (println YS)
 
-(defn debugg [s]
+(defn DBG [s]
     (when DEBUG
         (println s)))
 
@@ -56,23 +53,32 @@
 ;   field[GHOSTI]  [GHOSTJ]   = 1;
 ; }
 
+; tower takes four squares, i, j is a coord of its center
+; prevent building it when not all 4 squares are visible
 (defn build-tower [state]
-    (let [[i j] (state :ghost-tower)]
-        (update-in state [:towers] conj [i j])))
+    (let [[on-screen? i j] (state :ghost-tower)]
+        (if on-screen?
+            (update-in state [:towers] conj [i j])
+            state)))
 
 ; random number between low and high, both are included in consideration
 (defn rnd [low high]
        (+ low (random (- high low -0.5))))
 
-(defn xi [x]
-       (cond (<= x 0) 0
-             (>= x (nth XS (- N 2))) (- N 2)
-             :else (some #(when (<= x (nth XS %)) %) (range (- N 1)))))
-
-(defn yi [y]
-       (cond (<= y 0) 0
-             (>= y (nth YS (- M 2))) (- M 2)
-             :else (some #(when (<= y (nth YS %)) %) (range (- M 1)))))
+(def xi
+    (memoize
+       (fn [x]
+           (let [rc (cond (<= x 0) 0
+                          (>= x (XS (dec N))) (dec N)
+                          :else (some #(when (<= x (nth XS %)) (dec %)) (range (inc N))))]
+    	         rc))))
+  
+(def yi
+    (memoize
+       (fn [y]
+         (cond (<= y 0)      0
+               (>= y (YS (dec M))) (dec M)
+               :else (some #(when (<= y (nth YS %)) (dec %)) (range M))))))
 
 (def dirref {1  [1 -1]
              2  [1  0]
@@ -84,7 +90,7 @@
              8  [0 -1]})
 
 (defn move-zeek [zeek]
-    (debugg "move-zeek")
+;    (DBG "move-zeek")
     (let [[dx dy] (dirref (zeek :dir))
           i       (+ dx (zeek :i))
           j       (+ dy (zeek :j))]
@@ -95,21 +101,11 @@
               (assoc zeek :dir (int (rnd 1 8))))))
 
 (defn update-ghost-tower []
-    (debugg "update-ghost-tower")
-    (let [x (mouse-x)
-          y (mouse-y)]
-        (if (or (<= x 0) (>= x WIDTH) (<= y 0) (>= y HEIGHT))
-            [0 0]
-            (let [k  (xi x)
-                  l  (yi y)
-                  xs (for [i [k (inc k)] j [l (inc l)]] [(dist x y (XS i) (YS j)), i, j])
-                  rc (reduce (fn [acc b] 
-                              (if (< (first b) (first acc))
-                                  b
-                                  acc))
-                              [100000000 0 0]
-                              xs)]
-                  [(nth rc 1) (nth rc 2)]))))
+    (let [i (xi (mouse-x))
+          j (yi (mouse-y))]
+        (DBG (str "update-ghost-tower " i " " j))
+        [(and (< 0 i (dec N)) (< 0 j (dec M))), i, j]))
+
 
 (defn update-state [state]
         (let [now (milsec)]
@@ -134,18 +130,24 @@
 	(draw-zeek z)))
 
 (defn draw-tower [tower] 
-	(let [[i j] tower]
+	(let [[i j] tower     ;; i, j - center of tower
+              nwx (XS (dec i))
+              nwy (YS (dec j))
+              cx  (XS i)
+              cy  (XS j)]
 	    (stroke 0 0 0)
 	    (stroke-weight 2)
 	    (fill 200 200 200)
-	    (rect (XS i) (YS j) S S)
+	    (rect nwx nwy S S)
+
 	    (stroke-weight 4)
 	    (fill 50 50 50)
-	    (ellipse (XS (inc i)) (YS (inc j)) GS GS)
+	    (ellipse cx cy GS GS)
+
 	    (stroke 0 0 0)
 	    (stroke-weight 5)
-	    (line (XS (inc i)) (YS (inc j)) (+ (XS i) 10) (+ (YS j) 10))
-            (text "5" (- (XS (+ 2 i)) 10), (- (YS (+ j 2)) 10))))
+	    (line cx cy (+ nwx 10) (+ nwy 10))
+            (text "5" cx (+ cy 20))))
 	   
 (defn draw-towers [state]
         (doseq [t (state :towers)]
@@ -153,27 +155,30 @@
 
 (defn draw-grid [state]
         (stroke-weight 1)
-        (stroke 50 50 50)
+        (fill 150 150 150)
         (doseq [i (range N)]
-            (line (XS i) 0 (XS i) HEIGHT))
+	    (stroke (- 255 (* i 6)) 0 0)
+	    (text (str i) (XS i) (- HEIGHT 3))
+            (line (XS i) 0 (XS i) WIDTH))
         (doseq [j (range M)]
-            (line 0 (YS j) WIDTH (YS j))))
+	    (stroke (- 255 (* j 6)) 0 0)
+	    (text (str j) 15 (+ (YS j) 15))
+            (line 0 (YS j) HEIGHT (YS j))))
 
 (defn draw-ghost-tower [state]
-        (let [[i j] (state :ghost-tower)]
-            (when (and (pos? i) (pos? j))
+        (let [[on-screen? i j] (state :ghost-tower)]
+        (when on-screen?
                 (fill 0 200 0 45)
                 (stroke 0 0 0)
                 (rect (XS (dec i)) (YS (dec j)) S S)
                 (fill 180 180 180 45)
-                (ellipse (XS i) (YS j) (* 3 S) (* 3 S)))))
+                (ellipse (XS i) (YS j) S3 S3))))
 
 (defn draw-status [state]
         (fill 255 255 0)
-        (text (str "Amount: " AMOUNT
+        (text (str "Amount: " (state :amount)
                    "   Timer: " (state :elapsed)
-                   "   Lives: " LIVES) (XS 1), (YS 1)))
-
+                   "   Lives: " (state :lives)) (XS 1), (YS 1)))
 
 ;   if (field[GHOSTI-1][GHOSTJ-1] == 1 || field[GHOSTI]  [GHOSTJ-1] == 1 || 
 ;       field[GHOSTI-1][GHOSTJ]   == 1 || field[GHOSTI]  [GHOSTJ]   == 1 ||
@@ -213,7 +218,7 @@
 	(draw-ghost-tower state))
 
 (defn mouse-pressed [state event]
-	(debugg event)
+	(DBG event)
 	(build-tower state))
 
 (defn setup []
@@ -226,13 +231,14 @@
 	 :stimer      (milsec)
 	 :timer       (milsec)
          :elapsed     0
-         :ghost-tower [0 0]
+	 :lives       20
+         :ghost-tower [false 0 0]
          :zeeks       (for [_ (range NZEEKS)] {:i 2 :j 10 :dir (int (rnd 1 3))})
          :towers      []})
 
 (defsketch dtd
         :host          "host"
-        :size          [720 600]
+        :size          [WIDTH HEIGHT]
         :setup         setup
         :update        update-state
 	:mouse-pressed mouse-pressed
