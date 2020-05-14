@@ -1,3 +1,6 @@
+; To run from REPL:
+; (use 'dtd.core :reload-all)
+;
 (ns dtd.core
   (:use [quil.core]
         [quil.middleware]))
@@ -6,7 +9,7 @@
 (defn milsec []
     (System/currentTimeMillis))
 
-(def S         96)      ;; divisible by 2, 4, 6, 8
+(def S         48)      ;; divisible by 2, 4, 6, 8
 (def HS        (/ S 2))
 (def QS        (/ S 4))
 (def GS        (* 6 (/ S 8)))
@@ -53,12 +56,27 @@
 ;   field[GHOSTI]  [GHOSTJ]   = 1;
 ; }
 
+(defn spot-available? [field i j]
+    (let [i1  (dec i)
+          j1  (dec j)]
+        (and (field [i1 j1]) (field [i j1]) (field [i1 j])  (field [i j]))))
+
+(defn occupy-spot [field i j]
+    (let [i1  (dec i)
+          j1  (dec j)]
+        (assoc field [i1 j1] false [i j1] false
+                     [i1 j]  false [i j]  false)))
+
 ; tower takes four squares, i, j is a coord of its center
 ; prevent building it when not all 4 squares are visible
 (defn build-tower [state]
-    (let [[on-screen? i j] (state :ghost-tower)]
-        (if on-screen?
-            (update-in state [:towers] conj [i j])
+    (let [[ok i j] (state :ghost-tower)
+          i1 (dec i)
+          j1 (dec j)]
+        (if ok
+            (-> state
+                (update-in [:field]  occupy-spot i j)
+                (update-in [:towers] conj [i j]))
             state)))
 
 ; random number between low and high, both are included in consideration
@@ -100,11 +118,12 @@
               (assoc zeek :i i :j j) ; also need field[i][j] = 1
               (assoc zeek :dir (int (rnd 1 8))))))
 
-(defn update-ghost-tower []
-    (let [i (xi (mouse-x))
-          j (yi (mouse-y))]
-;        (DBG (str "update-ghost-tower " i " " j))
-        [(and (< 0 i N) (< 0 j M)), i, j]))
+(defn update-ghost-tower [field]
+    (let [i          (xi (mouse-x))
+          j          (yi (mouse-y))
+          on-screen  (and (< 0 i N) (< 0 j M))
+          meets-reqs (spot-available? field i j)]
+        [on-screen i, j, meets-reqs]))
 
 
 (defn update-state [state]
@@ -113,7 +132,7 @@
                 (assoc     :timer       now)
                 (assoc     :elapsed     (int (/ (- now (state :stimer)) 1000)))
     	        (update-in [:zeeks]     #(map move-zeek %))
-    	        (assoc     :ghost-tower (update-ghost-tower)))))
+    	        (assoc     :ghost-tower (update-ghost-tower (state :field))))))
 
 (defn key-pressed [state event] state)
 (defn key-released [state event] state)
@@ -165,13 +184,16 @@
             (line 0 j WIDTH j)))
 
 (defn draw-ghost-tower [state]
-        (let [[on-screen? i j] (state :ghost-tower)]
-        (when on-screen?
-                (fill 0 200 0 45)
-                (stroke 0 0 0)
-                (rect (XS (dec i)) (YS (dec j)) S S)
-                (fill 180 180 180 45)
-                (ellipse (XS i) (YS j) S3 S3))))
+        (println "draw-ghost-tower " (state :ghost-tower))
+        (let [[on-screen? i j meets-reqs] (state :ghost-tower)]
+            (when on-screen?
+                  (if meets-reqs
+                      (fill 0  200 0 45)
+                      (fill 200  0 0 45))
+                  (stroke 0 0 0)
+                  (rect (XS (dec i)) (YS (dec j)) S S)
+                  (fill 180 180 180 45)
+                  (ellipse (XS i) (YS j) S3 S3))))
 
 (defn draw-status [state]
         (fill 255 255 0)
@@ -226,7 +248,7 @@
          :levels      []
          :amount      100
          :level       1
-         :field       {}
+         :field       (zipmap (for [i (range N) j (range M)] [i j]) (repeat true))
 	 :stimer      (milsec)
 	 :timer       (milsec)
          :elapsed     0
