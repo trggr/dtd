@@ -103,8 +103,8 @@
 (defn update-ghost-tower []
     (let [i (xi (mouse-x))
           j (yi (mouse-y))]
-        (DBG (str "update-ghost-tower " i " " j))
-        [(and (< 0 i (dec N)) (< 0 j (dec M))), i, j]))
+;        (DBG (str "update-ghost-tower " i " " j))
+        [(and (< 0 i N) (< 0 j M)), i, j]))
 
 
 (defn update-state [state]
@@ -156,14 +156,13 @@
 (defn draw-grid [state]
         (stroke-weight 1)
         (fill 150 150 150)
+        (stroke 150 0 0)
         (doseq [i XS]
-	    (stroke 150 0 0)
 	    (text (str i) i (- HEIGHT 15))
-            (line i 0 i WIDTH))
+            (line i 0 i HEIGHT))
         (doseq [j YS]
-	    (stroke 150 0 0)
 	    (text (str j) 15 j)
-            (line 0 j HEIGHT j)))
+            (line 0 j WIDTH j)))
 
 (defn draw-ghost-tower [state]
         (let [[on-screen? i j] (state :ghost-tower)]
@@ -218,7 +217,7 @@
 	(draw-ghost-tower state))
 
 (defn mouse-pressed [state event]
-	(DBG event)
+;	(DBG event)
 	(build-tower state))
 
 (defn setup []
