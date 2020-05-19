@@ -9,7 +9,7 @@
 (defn milsec []
     (System/currentTimeMillis))
 
-(def S         48)      ;; divisible by 2, 4, 6, 8
+(def S         96)      ;; divisible by 2, 4, 6, 8
 (def HS        (/ S 2))
 (def QS        (/ S 4))
 (def GS        (* 6 (/ S 8)))
@@ -17,11 +17,15 @@
 
 (def N         20)
 (def M         18)
+(def N-1       (dec N))
+(def M-1       (dec M))
+(def N+1       (inc N))
+(def M+1       (inc M))
 (def WIDTH     (* HS N))
 (def HEIGHT    (* HS M))
 
-(def XS        (vec (for [i (range (inc N))] (* i HS))))
-(def YS        (vec (for [i (range (inc M))] (* i HS))))
+(def XS        (vec (for [i (range N+1)] (* i HS))))
+(def YS        (vec (for [i (range N+1)] (* i HS))))
 
 (def MAXTOWERS 60)
 (def NZEEKS    3)
@@ -35,28 +39,7 @@
     (when DEBUG
         (println s)))
 
-; //-----
-; void buildTower() {
-;   if (AMOUNT <= 0 ||
-;       NTOWERS >= MAXTOWERS ||
-;      field[GHOSTI-1][GHOSTJ-1] == 1 || field[GHOSTI][GHOSTJ-1] == 1 || 
-;      field[GHOSTI-1][GHOSTJ]   == 1 || field[GHOSTI][GHOSTJ]   == 1)
-;   {
-;      return;
-;   }
-; 
-;   AMOUNT -= 10;
-;   TOWERI[NTOWERS] = GHOSTI - 1;
-;   TOWERJ[NTOWERS] = GHOSTJ - 1;
-;   NTOWERS++;
-;   
-;   field[GHOSTI-1][GHOSTJ-1] = 1; // occupy 4 fields
-;   field[GHOSTI]  [GHOSTJ-1] = 1; 
-;   field[GHOSTI-1][GHOSTJ]   = 1;
-;   field[GHOSTI]  [GHOSTJ]   = 1;
-; }
-
-(defn spot-available? [field i j]
+(defn spot-avail? [field i j]
     (let [i1  (dec i)
           j1  (dec j)]
         (and (field [i1 j1]) (field [i j1]) (field [i1 j])  (field [i j]))))
@@ -70,10 +53,8 @@
 ; tower takes four squares, i, j is a coord of its center
 ; prevent building it when not all 4 squares are visible
 (defn build-tower [state]
-    (let [[ok i j] (state :ghost-tower)
-          i1 (dec i)
-          j1 (dec j)]
-        (if ok
+    (let [[on-screen i, j, meets-reqs] (state :ghost-tower)]
+        (if (and on-screen meets-reqs)
             (-> state
                 (update-in [:field]  occupy-spot i j)
                 (update-in [:towers] conj [i j]))
@@ -87,15 +68,15 @@
     (memoize
        (fn [x]
            (let [rc (cond (<= x 0) 0
-                          (>= x (XS (dec N))) (dec N)
-                          :else (some #(when (<= x (nth XS %)) (dec %)) (range (inc N))))]
+                          (>= x (XS N-1)) N-1
+                          :else (some #(when (<= x (nth XS %)) (dec %)) (range N+1)))]
     	         rc))))
   
 (def yi
     (memoize
        (fn [y]
          (cond (<= y 0)      0
-               (>= y (YS (dec M))) (dec M)
+               (>= y (YS M-1)) M-1
                :else (some #(when (<= y (nth YS %)) (dec %)) (range M))))))
 
 (def dirref {1  [1 -1]
@@ -122,7 +103,7 @@
     (let [i          (xi (mouse-x))
           j          (yi (mouse-y))
           on-screen  (and (< 0 i N) (< 0 j M))
-          meets-reqs (spot-available? field i j)]
+          meets-reqs (spot-avail? field i j)]
         [on-screen i, j, meets-reqs]))
 
 
@@ -173,15 +154,23 @@
              (draw-tower t)))
 
 (defn draw-grid [state]
+    (let [field (state :field)]
         (stroke-weight 1)
-        (fill 150 150 150)
+        (fill 0 0 0)
+        (stroke 50 0 0)
+        (doseq [i (range N+1)]
+            (let [x (XS i)]
+   	        (text (str i) x (- HEIGHT 15))
+                (line x 0 x HEIGHT)))
+        (doseq [j (range M+1)]
+            (let [y (YS j)]
+	        (text (str j) 15 y)
+                (line 0 y WIDTH y)))
         (stroke 150 0 0)
-        (doseq [i XS]
-	    (text (str i) i (- HEIGHT 15))
-            (line i 0 i HEIGHT))
-        (doseq [j YS]
-	    (text (str j) 15 j)
-            (line 0 j WIDTH j)))
+        (stroke-weight 3)
+	(doseq [i (range N) j (range M)]
+	    (if (not (field [i j]))
+		(line (XS i) (YS j) (XS (inc i)) (YS (inc j)))))))
 
 (defn draw-ghost-tower [state]
         (println "draw-ghost-tower " (state :ghost-tower))
@@ -200,22 +189,6 @@
         (text (str "Amount: " (state :amount)
                    "   Timer: " (state :elapsed)
                    "   Lives: " (state :lives)) (XS 1), (YS 1)))
-
-;   if (field[GHOSTI-1][GHOSTJ-1] == 1 || field[GHOSTI]  [GHOSTJ-1] == 1 || 
-;       field[GHOSTI-1][GHOSTJ]   == 1 || field[GHOSTI]  [GHOSTJ]   == 1 ||
-;       AMOUNT <= 0) {
-;           fill(200, 0, 0, 45);
-;    } else { 
-;           fill(0, 200, 0, 45);
-;    }
-;    stroke(0, 0, 0);
-;    rect(XS[GHOSTI-1], YS[GHOSTJ-1], S, S);
-; 
-;    // reach
-; 
-;    fill(180, 180, 180, 45);
-;    ellipse(XS[GHOSTI], YS[GHOSTJ], S*3, S*3);
-; }
 
 ; void draw() {
 ;+   clear();
@@ -242,18 +215,28 @@
 ;	(DBG event)
 	(build-tower state))
 
+(defn setup-field []
+    (let [m (zipmap (for [i (range N) j (range M)] [i j]) (repeat true))]
+        (reduce #(assoc %1 %2 false)
+                m
+                (concat 
+                        (for [i (range N)] [i 0])
+                        (for [i (range N)] [i M-1])
+                        (for [j (range M)] [0 j])
+                        (for [j (range M)] [N-1 j])))))
+
 (defn setup []
         (frame-rate   30)
         {:tower-types []
          :levels      []
          :amount      100
          :level       1
-         :field       (zipmap (for [i (range N) j (range M)] [i j]) (repeat true))
+         :field       (setup-field)
 	 :stimer      (milsec)
 	 :timer       (milsec)
          :elapsed     0
 	 :lives       20
-         :ghost-tower [false 0 0]
+         :ghost-tower [false 0 0 false] ; [on-screen i, j, meets-reqs]
          :zeeks       (for [_ (range NZEEKS)] {:i 2 :j 10 :dir (int (rnd 1 3))})
          :towers      []})
 
